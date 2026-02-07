@@ -1,0 +1,151 @@
+erDiagram
+    %% ============================================
+    %% NEXUS INVENTORY - DIAGRAMA ENTIDAD-RELACIÓN
+    %% Base de Datos PostgreSQL (Backend Hub)
+    %% ============================================
+
+    TENANTS ||--o{ SEDES : "tiene"
+    TENANTS ||--o{ USERS : "tiene"
+    TENANTS ||--o{ PRODUCTS_CONSOLIDATED : "tiene"
+    TENANTS ||--o{ INVENTORY_CONSOLIDATED : "tiene"
+    TENANTS ||--o{ TRANSACTIONS_LOG : "tiene"
+    TENANTS ||--o{ TRANSFERS : "tiene"
+    TENANTS ||--o{ AUDIT_LOGS : "tiene"
+    
+    SEDES ||--o{ USERS : "asignado_a"
+    SEDES ||--o{ INVENTORY_CONSOLIDATED : "tiene"
+    SEDES ||--o{ TRANSACTIONS_LOG : "origina"
+    SEDES ||--o{ TRANSFERS : "origen"
+    SEDES ||--o{ TRANSFERS : "destino"
+    
+    USERS ||--o{ TRANSACTIONS_LOG : "registra"
+    USERS ||--o{ TRANSFERS : "solicita"
+    USERS ||--o{ AUDIT_LOGS : "realiza"
+    
+    PRODUCTS_CONSOLIDATED ||--o{ INVENTORY_CONSOLIDATED : "tiene_stock_en"
+    PRODUCTS_CONSOLIDATED ||--o{ TRANSACTIONS_LOG : "afecta"
+    PRODUCTS_CONSOLIDATED ||--o{ TRANSFERS : "transferido"
+    
+    INVENTORY_CONSOLIDATED }o--|| SEDES : "pertenece_a"
+    INVENTORY_CONSOLIDATED }o--|| PRODUCTS_CONSOLIDATED : "es_stock_de"
+    
+    TRANSACTIONS_LOG }o--|| SEDES : "ocurre_en"
+    TRANSACTIONS_LOG }o--|| PRODUCTS_CONSOLIDATED : "afecta_a"
+    TRANSACTIONS_LOG }o--|| USERS : "realizada_por"
+    
+    TRANSFERS }o--|| SEDES : "desde"
+    TRANSFERS }o--|| SEDES : "hacia"
+    TRANSFERS }o--|| PRODUCTS_CONSOLIDATED : "producto"
+    TRANSFERS }o--|| USERS : "solicitada_por"
+
+    %% ============================================
+    %% DEFINICIÓN DE ENTIDADES
+    %% ============================================
+
+    TENANTS {
+        uuid id PK "Identificador único del tenant"
+        string name "Nombre de la organización"
+        string plan "FREE | BASIC | PREMIUM | ENTERPRISE"
+        string status "ACTIVE | SUSPENDED | CANCELLED"
+        jsonb settings "Configuraciones personalizadas"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Última actualización"
+    }
+
+    SEDES {
+        uuid id PK "Identificador único de la sede"
+        uuid tenant_id FK "Referencia al tenant"
+        string name "Nombre de la sede (ej: Tienda Norte)"
+        string code "Código corto único (ej: TN-001)"
+        string address "Dirección física"
+        string status "ACTIVE | INACTIVE | MAINTENANCE"
+        timestamp last_sync_at "Última sincronización exitosa"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Última actualización"
+    }
+
+    USERS {
+        uuid id PK "Identificador único del usuario"
+        uuid tenant_id FK "Referencia al tenant"
+        uuid sede_id FK "Sede asignada (nullable para admins)"
+        string email "Email único por tenant"
+        string password_hash "Hash bcrypt de la contraseña"
+        string role "SUPER_ADMIN | TENANT_ADMIN | MANAGER | STAFF"
+        string status "ACTIVE | INACTIVE | LOCKED"
+        timestamp last_login_at "Último acceso"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Última actualización"
+    }
+
+    PRODUCTS_CONSOLIDATED {
+        uuid id PK "Identificador único del producto"
+        uuid tenant_id FK "Referencia al tenant"
+        string sku "Código único del producto"
+        string name "Nombre del producto"
+        text description "Descripción detallada"
+        string category "Categoría del producto"
+        decimal price "Precio de venta"
+        decimal cost "Costo de adquisición"
+        string unit "UNIT | KG | LITER | BOX | etc"
+        jsonb metadata "Datos adicionales (imágenes, specs)"
+        int version "Control de versión para conflictos"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Última actualización"
+    }
+
+    INVENTORY_CONSOLIDATED {
+        uuid id PK "Identificador único"
+        uuid tenant_id FK "Referencia al tenant"
+        uuid sede_id FK "Sede donde está el stock"
+        uuid product_id FK "Producto"
+        decimal quantity "Cantidad actual en stock"
+        decimal min_stock "Stock mínimo (alerta)"
+        decimal max_stock "Stock máximo"
+        timestamp last_sync_at "Última sincronización de esta sede"
+        timestamp updated_at "Última actualización"
+    }
+
+    TRANSACTIONS_LOG {
+        uuid id PK "Identificador único"
+        uuid tenant_id FK "Referencia al tenant"
+        uuid sede_id FK "Sede donde ocurrió"
+        uuid product_id FK "Producto afectado"
+        uuid user_id FK "Usuario que registró"
+        string type "IN | OUT | ADJUSTMENT | TRANSFER_IN | TRANSFER_OUT"
+        decimal quantity "Cantidad (positiva o negativa)"
+        string reason "Motivo de la transacción"
+        uuid transfer_id FK "Si es parte de transferencia (nullable)"
+        timestamp timestamp "Momento de la transacción"
+        timestamp synced_at "Cuándo se sincronizó al backend"
+        jsonb metadata "Datos adicionales"
+    }
+
+    TRANSFERS {
+        uuid id PK "Identificador único"
+        uuid tenant_id FK "Referencia al tenant"
+        uuid from_sede_id FK "Sede origen"
+        uuid to_sede_id FK "Sede destino"
+        uuid product_id FK "Producto a transferir"
+        uuid requested_by FK "Usuario que solicitó"
+        uuid approved_by FK "Usuario que aprobó (nullable)"
+        decimal quantity "Cantidad a transferir"
+        string status "PENDING | APPROVED | REJECTED | PROCESSING | COMPLETED | FAILED"
+        text rejection_reason "Motivo de rechazo (nullable)"
+        timestamp requested_at "Fecha de solicitud"
+        timestamp approved_at "Fecha de aprobación (nullable)"
+        timestamp completed_at "Fecha de completado (nullable)"
+        jsonb metadata "Datos adicionales del proceso"
+    }
+
+    AUDIT_LOGS {
+        uuid id PK "Identificador único"
+        uuid tenant_id FK "Referencia al tenant"
+        uuid user_id FK "Usuario que realizó la acción"
+        uuid sede_id FK "Sede donde ocurrió (nullable)"
+        string action "CREATE | UPDATE | DELETE | TRANSFER | SYNC"
+        string entity_type "PRODUCT | INVENTORY | USER | TRANSFER | etc"
+        uuid entity_id "ID de la entidad afectada"
+        jsonb metadata "Detalles de la acción (before/after)"
+        string ip_address "IP del cliente"
+        timestamp timestamp "Momento de la acción"
+    }
