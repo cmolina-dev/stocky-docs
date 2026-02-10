@@ -6,7 +6,7 @@
 - Diagrama ERD
 - Diagram de ciclo de vida y estados
 - Diagrama de secuencia para transferencias de inventario
-
+- Esquemas base de datos local (RxDB)
 ##### Nota:
 
 Para poder ver el documento ERD_Hub.md y Schema_indexedDB.md hay que instalar un plugin en vs code que permita renderizar mermaid en markdown.
